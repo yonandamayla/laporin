@@ -544,13 +544,9 @@ class _ReportListScreenState extends State<ReportListScreen> {
 
   Color _getStatusColor(ReportStatus status) {
     switch (status) {
-      case ReportStatus.pending:
-        return AppColors.warning;
-      case ReportStatus.approved:
-        return AppColors.info;
       case ReportStatus.inProgress:
-        return AppColors.primary;
-      case ReportStatus.resolved:
+        return AppColors.info;
+      case ReportStatus.approved:
         return AppColors.success;
       case ReportStatus.rejected:
         return AppColors.error;

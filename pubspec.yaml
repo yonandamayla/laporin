@@ -69,6 +69,9 @@ dependencies:
   
   # Badges & Chips
   badges: ^3.1.2
+  
+  # Persistent Bottom Navigation Bar
+  persistent_bottom_nav_bar: ^6.2.1
 
 dev_dependencies:
   flutter_test:

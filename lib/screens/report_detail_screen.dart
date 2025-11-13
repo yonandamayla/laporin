@@ -6,6 +6,7 @@ import 'package:laporin/providers/auth_provider.dart';
 import 'package:laporin/providers/report_provider.dart';
 import 'package:laporin/models/enums.dart';
 import 'package:laporin/models/report_model.dart';
+import 'package:laporin/screens/create_report_screen.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -218,6 +219,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   void _showStatusOptions() {
+    final authProvider = context.read<AuthProvider>();
+    final isAdmin = authProvider.canManageReports();
+    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -232,7 +236,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             children: [
               Text('Ubah Status Laporan', style: AppTextStyles.h3),
               const SizedBox(height: 16),
-              if (_report?.status == ReportStatus.approved)
+              if (isAdmin && _report?.status == ReportStatus.approved)
                 ListTile(
                   leading: const Icon(Icons.autorenew, color: AppColors.primary),
                   title: const Text('Mulai Proses'),
@@ -241,13 +245,125 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     _updateStatus(ReportStatus.inProgress);
                   },
                 ),
-              if (_report?.status == ReportStatus.inProgress)
+              if (isAdmin && _report?.status == ReportStatus.inProgress)
                 ListTile(
                   leading: const Icon(Icons.check_circle, color: AppColors.success),
-                  title: const Text('Selesaikan'),
+                  title: const Text('Setujui'),
                   onTap: () {
                     Navigator.pop(context);
-                    _updateStatus(ReportStatus.resolved);
+                    _updateStatus(ReportStatus.approved);
+                  },
+                ),
+              if (isAdmin && _report?.status == ReportStatus.inProgress)
+                ListTile(
+                  leading: const Icon(Icons.cancel, color: AppColors.error),
+                  title: const Text('Tolak'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _updateStatus(ReportStatus.rejected);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _editReport() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateReportScreen(report: _report),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _loadReport(); // Refresh data
+    }
+  }
+
+  Future<void> _deleteReport() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Hapus Laporan?', style: AppTextStyles.h3),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus laporan ini? Tindakan ini tidak dapat dibatalkan.',
+          style: AppTextStyles.body,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final reportProvider = context.read<ReportProvider>();
+      final success = await reportProvider.deleteReport(_report!.id);
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Laporan berhasil dihapus'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pop(context, true); // Kembali ke halaman sebelumnya
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(reportProvider.errorMessage ?? 'Gagal menghapus laporan'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showUserOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Opsi Laporan', style: AppTextStyles.h3),
+              const SizedBox(height: 16),
+              if (_report!.canBeEdited)
+                ListTile(
+                  leading: const Icon(Icons.edit, color: AppColors.primary),
+                  title: const Text('Edit Laporan'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editReport();
+                  },
+                ),
+              if (_report!.canBeEdited)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: AppColors.error),
+                  title: const Text('Hapus Laporan'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deleteReport();
                   },
                 ),
             ],
@@ -261,6 +377,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final isAdmin = authProvider.canManageReports();
+    final isOwner = _report != null && 
+        authProvider.currentUser?.id == _report!.reporter.id;
 
     if (_isLoading) {
       return Scaffold(
@@ -307,11 +425,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           style: AppTextStyles.h3.copyWith(color: AppColors.white),
         ),
         actions: [
-          if (isAdmin && _report!.status == ReportStatus.approved || 
-              _report!.status == ReportStatus.inProgress)
+          if (isAdmin && 
+              (_report!.status == ReportStatus.approved || 
+               _report!.status == ReportStatus.inProgress))
             IconButton(
               icon: const Icon(Icons.more_vert),
               onPressed: _showStatusOptions,
+            ),
+          if (!isAdmin && isOwner && _report!.canBeEdited)
+            IconButton(
+              icon: const Icon(Icons.more_vert),
+              onPressed: _showUserOptions,
             ),
         ],
       ),
@@ -559,10 +683,31 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Lampiran (${_report!.media.length})', style: AppTextStyles.h3),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.image,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Foto Lampiran (${_report!.media.length})',
+                          style: AppTextStyles.h3,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap gambar untuk memperbesar',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     SizedBox(
-                      height: 120,
+                      height: 150,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         itemCount: _report!.media.length,
@@ -570,25 +715,84 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           final media = _report!.media[index];
                           return Padding(
                             padding: const EdgeInsets.only(right: 12),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                File(media.url),
-                                width: 120,
-                                height: 120,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    width: 120,
-                                    height: 120,
-                                    color: AppColors.greyLight,
-                                    child: const Icon(
-                                      Icons.image,
-                                      size: 48,
-                                      color: AppColors.greyDark,
+                            child: GestureDetector(
+                              onTap: () => _showImageFullScreen(context, media.url, index),
+                              child: Hero(
+                                tag: 'image_$index',
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppColors.greyLight,
+                                      width: 2,
                                     ),
-                                  );
-                                },
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Stack(
+                                      children: [
+                                        Image.file(
+                                          File(media.url),
+                                          width: 150,
+                                          height: 150,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              width: 150,
+                                              height: 150,
+                                              color: AppColors.greyLight,
+                                              child: const Icon(
+                                                Icons.broken_image,
+                                                size: 48,
+                                                color: AppColors.greyDark,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(alpha: 0.6),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.zoom_in,
+                                                  color: AppColors.white,
+                                                  size: 14,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${index + 1}/${_report!.media.length}',
+                                                  style: AppTextStyles.caption.copyWith(
+                                                    color: AppColors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           );
@@ -807,13 +1011,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
   Color _getStatusColor(ReportStatus status) {
     switch (status) {
-      case ReportStatus.pending:
-        return AppColors.warning;
-      case ReportStatus.approved:
-        return AppColors.info;
       case ReportStatus.inProgress:
-        return AppColors.primary;
-      case ReportStatus.resolved:
+        return AppColors.info;
+      case ReportStatus.approved:
         return AppColors.success;
       case ReportStatus.rejected:
         return AppColors.error;
@@ -839,5 +1039,71 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     } else {
       return DateFormat('dd MMM yyyy').format(date);
     }
+  }
+
+  void _showImageFullScreen(BuildContext context, String imagePath, int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: AppColors.white,
+            title: Text(
+              'Foto ${initialIndex + 1} dari ${_report!.media.length}',
+              style: AppTextStyles.bodyLarge.copyWith(color: AppColors.white),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          body: PageView.builder(
+            controller: PageController(initialPage: initialIndex),
+            itemCount: _report!.media.length,
+            onPageChanged: (index) {
+              // Update title when page changes
+            },
+            itemBuilder: (context, index) {
+              return Center(
+                child: Hero(
+                  tag: 'image_$index',
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Image.file(
+                      File(_report!.media[index].url),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.broken_image,
+                              size: 80,
+                              color: AppColors.greyLight,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Gambar tidak dapat dimuat',
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.greyLight,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 }

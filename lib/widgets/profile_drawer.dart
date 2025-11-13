@@ -5,6 +5,7 @@ import 'package:laporin/constants/colors.dart';
 import 'package:laporin/constants/text_styles.dart';
 import 'package:laporin/models/enums.dart';
 import 'package:laporin/screens/create_report_screen.dart';
+import 'package:laporin/screens/admin_dashboard_screen.dart';
 import 'package:badges/badges.dart' as badges;
 
 class ProfileDrawer extends StatelessWidget {
@@ -188,10 +189,15 @@ class ProfileDrawer extends StatelessWidget {
               if (authProvider.canManageReports())
                 _buildMenuItem(
                   icon: Icons.admin_panel_settings_outlined,
-                  title: 'Kelola Laporan',
+                  title: 'Admin Dashboard',
                   onTap: () {
                     Navigator.pop(context);
-                    // TODO: Navigate to admin dashboard
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AdminDashboardScreen(),
+                      ),
+                    );
                   },
                 ),
               const Divider(height: 32),

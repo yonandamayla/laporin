@@ -95,7 +95,19 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
 
-      // Create user with role
+      // Mock users for testing
+      User? mockUser = _getMockUser(email, password);
+      
+      if (mockUser != null) {
+        _currentUser = mockUser;
+        await _saveUserData(_currentUser!);
+        _status = AuthStatus.authenticated;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
+      // If not mock user, validate and create dynamic user
       final userRole = role ?? UserRole.mahasiswa;
       final userId = DateTime.now().millisecondsSinceEpoch.toString();
       
@@ -280,6 +292,51 @@ class AuthProvider with ChangeNotifier {
   bool _isValidEmail(String email) {
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     return emailRegex.hasMatch(email);
+  }
+
+  // Get mock user for testing
+  User? _getMockUser(String email, String password) {
+    // Mock Admin Account
+    if (email == 'admin@laporin.com' && password == 'admin123') {
+      return User(
+        id: 'admin001',
+        name: 'Admin Laporin',
+        email: 'admin@laporin.com',
+        role: UserRole.admin,
+        nip: '198501012010011001',
+        phone: '081234567890',
+        createdAt: DateTime(2024, 1, 1),
+      );
+    }
+
+    // Mock Mahasiswa Account
+    if (email == 'mahasiswa@student.polinema.ac.id' && password == 'mahasiswa123') {
+      return User(
+        id: 'mhs001',
+        name: 'Budi Santoso',
+        email: 'mahasiswa@student.polinema.ac.id',
+        role: UserRole.mahasiswa,
+        nim: '2341720001',
+        phone: '081234567891',
+        createdAt: DateTime(2024, 9, 1),
+      );
+    }
+
+    // Mock Dosen Account
+    if (email == 'dosen@polinema.ac.id' && password == 'dosen123') {
+      return User(
+        id: 'dsn001',
+        name: 'Dr. Siti Aminah',
+        email: 'dosen@polinema.ac.id',
+        role: UserRole.dosen,
+        nip: '198203152006042001',
+        phone: '081234567892',
+        createdAt: DateTime(2024, 1, 1),
+      );
+    }
+
+    // No mock user found
+    return null;
   }
 
   // Clear error message

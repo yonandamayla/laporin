@@ -201,6 +201,218 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 20),
                   
+                  // Role Selection
+                  Text(
+                    'Pilih Role',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<UserRole>(
+                    initialValue: _selectedRole,
+                    decoration: InputDecoration(
+                      hintText: 'Pilih role Anda',
+                      hintStyle: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textHint,
+                      ),
+                      prefixIcon: const Icon(Icons.badge_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.greyLight),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.greyLight),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.background,
+                    ),
+                    items: UserRole.values.map((role) {
+                      return DropdownMenuItem<UserRole>(
+                        value: role,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: role.color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              role.displayName,
+                              style: AppTextStyles.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedRole = value!;
+                        // Clear NIM/NIP when role changes
+                        _nimController.clear();
+                        _nipController.clear();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // NIM Field (only for Mahasiswa)
+                  if (_selectedRole == UserRole.mahasiswa) ...[
+                    Text(
+                      'NIM',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _nimController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Masukkan NIM Anda (10 digit)',
+                        hintStyle: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textHint,
+                        ),
+                        prefixIcon: const Icon(Icons.credit_card_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.greyLight),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.greyLight),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: AppColors.background,
+                      ),
+                      validator: (value) {
+                        if (_selectedRole == UserRole.mahasiswa) {
+                          if (value == null || value.isEmpty) {
+                            return 'NIM tidak boleh kosong';
+                          }
+                          if (value.length != 10) {
+                            return 'NIM harus 10 digit';
+                          }
+                          if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                            return 'NIM harus berupa angka';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  
+                  // NIP Field (only for Dosen)
+                  if (_selectedRole == UserRole.dosen) ...[
+                    Text(
+                      'NIP',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _nipController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: 'Masukkan NIP Anda (18 digit)',
+                        hintStyle: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textHint,
+                        ),
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.greyLight),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.greyLight),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: AppColors.background,
+                      ),
+                      validator: (value) {
+                        if (_selectedRole == UserRole.dosen) {
+                          if (value == null || value.isEmpty) {
+                            return 'NIP tidak boleh kosong';
+                          }
+                          if (value.length != 18) {
+                            return 'NIP harus 18 digit';
+                          }
+                          if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                            return 'NIP harus berupa angka';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  
+                  // Phone Field (optional for all roles)
+                  Text(
+                    'No. Telepon ${_selectedRole == UserRole.admin ? '' : '(Opsional)'}',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      hintText: 'Masukkan nomor telepon',
+                      hintStyle: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textHint,
+                      ),
+                      prefixIcon: const Icon(Icons.phone_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.greyLight),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.greyLight),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.background,
+                    ),
+                    validator: (value) {
+                      if (value != null && value.isNotEmpty) {
+                        if (value.length < 10) {
+                          return 'Nomor telepon minimal 10 digit';
+                        }
+                        if (!RegExp(r'^[0-9+]+$').hasMatch(value)) {
+                          return 'Nomor telepon tidak valid';
+                        }
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  
                   // Password Field
                   Text(
                     'Password',

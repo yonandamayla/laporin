@@ -10,11 +10,14 @@ import 'package:laporin/providers/report_provider.dart';
 import 'package:laporin/models/enums.dart';
 import 'package:laporin/models/location_model.dart';
 import 'package:laporin/models/media_model.dart';
+import 'package:laporin/models/report_model.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:io';
 
 class CreateReportScreen extends StatefulWidget {
-  const CreateReportScreen({super.key});
+  final Report? report;
+  
+  const CreateReportScreen({super.key, this.report});
 
   @override
   State<CreateReportScreen> createState() => _CreateReportScreenState();
@@ -31,6 +34,23 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   final List<XFile> _images = [];
   bool _isLoadingLocation = false;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFormForEdit();
+  }
+
+  void _initializeFormForEdit() {
+    if (widget.report != null) {
+      _titleController.text = widget.report!.title;
+      _descriptionController.text = widget.report!.description;
+      _selectedCategory = widget.report!.category;
+      _selectedPriority = widget.report!.priority;
+      _location = widget.report!.location;
+      // Note: Images dari report tidak bisa diedit untuk sederhananya
+    }
+  }
 
   @override
   void dispose() {
@@ -134,32 +154,53 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       );
 
       // Get address from coordinates
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      String address = 'Lat: ${position.latitude.toStringAsFixed(6)}, Long: ${position.longitude.toStringAsFixed(6)}';
+      
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
 
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        final address = '${place.street}, ${place.subLocality}, ${place.locality}';
-        
-        setState(() {
-          _location = LocationData(
-            latitude: position.latitude,
-            longitude: position.longitude,
-            address: address,
-          );
-          _isLoadingLocation = false;
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Lokasi berhasil didapatkan'),
-              backgroundColor: AppColors.success,
-            ),
-          );
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          // Build address with null safety
+          final List<String> addressParts = [];
+          if (place.street != null && place.street!.isNotEmpty) {
+            addressParts.add(place.street!);
+          }
+          if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+            addressParts.add(place.subLocality!);
+          }
+          if (place.locality != null && place.locality!.isNotEmpty) {
+            addressParts.add(place.locality!);
+          }
+          
+          if (addressParts.isNotEmpty) {
+            address = addressParts.join(', ');
+          }
         }
+      } catch (e) {
+        // If geocoding fails, use coordinates as address
+        debugPrint('Geocoding error: $e');
+      }
+      
+      setState(() {
+        _location = LocationData(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          address: address,
+        );
+        _isLoadingLocation = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lokasi berhasil didapatkan'),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
     } catch (e) {
       setState(() {
@@ -200,32 +241,49 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     });
 
     try {
-      // Convert images to MediaFile objects
-      final mediaFiles = _images
-          .map((image) => MediaFile(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                url: image.path,
-                type: MediaType.image,
-                uploadedAt: DateTime.now(),
-              ))
-          .toList();
-
       final reportProvider = context.read<ReportProvider>();
-      final success = await reportProvider.createReport(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        category: _selectedCategory,
-        priority: _selectedPriority,
-        reporter: user,
-        location: _location,
-        media: mediaFiles,
-      );
+      bool success;
+
+      // Check if this is edit mode or create mode
+      if (widget.report != null) {
+        // Edit mode - update existing report
+        success = await reportProvider.updateReport(
+          widget.report!.id,
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          category: _selectedCategory,
+          priority: _selectedPriority,
+        );
+      } else {
+        // Create mode - create new report
+        // Convert images to MediaFile objects
+        final mediaFiles = _images
+            .map((image) => MediaFile(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  url: image.path,
+                  type: MediaType.image,
+                  uploadedAt: DateTime.now(),
+                ))
+            .toList();
+
+        success = await reportProvider.createReport(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim(),
+          category: _selectedCategory,
+          priority: _selectedPriority,
+          reporter: user,
+          location: _location,
+          media: mediaFiles,
+        );
+      }
 
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Laporan berhasil dibuat'),
+            SnackBar(
+              content: Text(widget.report != null 
+                  ? 'Laporan berhasil diupdate' 
+                  : 'Laporan berhasil dibuat'),
               backgroundColor: AppColors.success,
             ),
           );
@@ -233,7 +291,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(reportProvider.errorMessage ?? 'Gagal membuat laporan'),
+              content: Text(reportProvider.errorMessage ?? 
+                  (widget.report != null 
+                      ? 'Gagal mengupdate laporan' 
+                      : 'Gagal membuat laporan')),
               backgroundColor: AppColors.error,
             ),
           );
@@ -262,7 +323,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Buat Laporan',
+          widget.report != null ? 'Edit Laporan' : 'Buat Laporan',
           style: AppTextStyles.h3.copyWith(color: AppColors.white),
         ),
         leading: IconButton(
@@ -334,10 +395,76 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               const SizedBox(height: 16),
 
               // Priority Dropdown
+              Text(
+                'Prioritas Laporan',
+                style: AppTextStyles.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              // Priority Guide Info Box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.info.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 18,
+                          color: AppColors.info,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Panduan Memilih Prioritas:',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.info,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildPriorityGuide(
+                      ReportPriority.low,
+                      '🟢 Rendah',
+                      'Mempengaruhi satu individu / masalah kosmetik',
+                      'Contoh: 1 kursi rusak, cat mengelupas, lampu meja mati',
+                    ),
+                    const SizedBox(height: 6),
+                    _buildPriorityGuide(
+                      ReportPriority.medium,
+                      '🟡 Sedang',
+                      'Mempengaruhi satu kelompok kecil / kenyamanan umum satu ruangan',
+                      'Contoh: AC bocor, WiFi lambat, toilet kotor',
+                    ),
+                    const SizedBox(height: 6),
+                    _buildPriorityGuide(
+                      ReportPriority.high,
+                      '🔴 Tinggi',
+                      'Mempengaruhi satu lokasi besar / banyak orang / proses vital / keamanan',
+                      'Contoh: Listrik padam, kebocoran gas, server mati, proyektor di kelas yang sedang berlangsung',
+                    ),
+                    const SizedBox(height: 6),
+                    
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              
               DropdownButtonFormField<ReportPriority>(
                 initialValue: _selectedPriority,
                 decoration: const InputDecoration(
-                  labelText: 'Prioritas',
+                  labelText: 'Pilih Tingkat Prioritas',
                   prefixIcon: Icon(Icons.priority_high),
                 ),
                 items: ReportPriority.values.map((priority) {
@@ -558,7 +685,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           ),
                         )
                       : Text(
-                          'Kirim Laporan',
+                          widget.report != null ? 'Update Laporan' : 'Kirim Laporan',
                           style: AppTextStyles.button,
                         ),
                 ),
@@ -569,6 +696,49 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPriorityGuide(
+    ReportPriority priority,
+    String title,
+    String description,
+    String example,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.caption.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                description,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 10,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                example,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 9,
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

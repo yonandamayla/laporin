@@ -82,22 +82,16 @@ enum ReportCategory {
 
 // Report Status Enum
 enum ReportStatus {
-  pending,
-  approved,
   inProgress,
-  resolved,
+  approved,
   rejected;
 
   String get displayName {
     switch (this) {
-      case ReportStatus.pending:
-        return 'Menunggu Persetujuan';
+      case ReportStatus.inProgress:
+        return 'Diproses';
       case ReportStatus.approved:
         return 'Disetujui';
-      case ReportStatus.inProgress:
-        return 'Dalam Proses';
-      case ReportStatus.resolved:
-        return 'Selesai';
       case ReportStatus.rejected:
         return 'Ditolak';
     }
@@ -105,13 +99,9 @@ enum ReportStatus {
 
   String get color {
     switch (this) {
-      case ReportStatus.pending:
-        return 'warning';
-      case ReportStatus.approved:
-        return 'info';
       case ReportStatus.inProgress:
-        return 'primary';
-      case ReportStatus.resolved:
+        return 'info';
+      case ReportStatus.approved:
         return 'success';
       case ReportStatus.rejected:
         return 'error';
@@ -136,6 +126,32 @@ enum ReportPriority {
         return 'Tinggi';
       case ReportPriority.urgent:
         return 'Mendesak';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case ReportPriority.low:
+        return 'Tidak mengganggu aktivitas, bisa ditangani nanti';
+      case ReportPriority.medium:
+        return 'Cukup mengganggu, perlu segera ditangani';
+      case ReportPriority.high:
+        return 'Sangat mengganggu aktivitas, butuh penanganan cepat';
+      case ReportPriority.urgent:
+        return 'Berbahaya/kritis, memerlukan tindakan segera!';
+    }
+  }
+
+  String get example {
+    switch (this) {
+      case ReportPriority.low:
+        return 'Contoh: Cat dinding mengelupas, lampu mati 1 buah';
+      case ReportPriority.medium:
+        return 'Contoh: Kursi rusak, AC kurang dingin';
+      case ReportPriority.high:
+        return 'Contoh: Proyektor tidak nyala, pintu rusak';
+      case ReportPriority.urgent:
+        return 'Contoh: Kebocoran parah, kabel terkelupas, bahaya keamanan';
     }
   }
 

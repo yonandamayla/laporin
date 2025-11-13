@@ -62,10 +62,8 @@ class ReportProvider with ChangeNotifier {
   Map<String, int> getReportStats() {
     return {
       'total': _reports.length,
-      'pending': _reports.where((r) => r.status == ReportStatus.pending).length,
-      'approved': _reports.where((r) => r.status == ReportStatus.approved).length,
       'inProgress': _reports.where((r) => r.status == ReportStatus.inProgress).length,
-      'resolved': _reports.where((r) => r.status == ReportStatus.resolved).length,
+      'approved': _reports.where((r) => r.status == ReportStatus.approved).length,
       'rejected': _reports.where((r) => r.status == ReportStatus.rejected).length,
     };
   }
@@ -167,7 +165,7 @@ class ReportProvider with ChangeNotifier {
         description: description,
         category: category,
         priority: priority,
-        status: ReportStatus.pending,
+        status: ReportStatus.inProgress,
         reporter: reporter,
         location: location,
         media: media ?? [],
@@ -324,7 +322,7 @@ class ReportProvider with ChangeNotifier {
         status: newStatus,
         adminNote: note,
         updatedAt: DateTime.now(),
-        resolvedAt: newStatus == ReportStatus.resolved ? DateTime.now() : null,
+        resolvedAt: newStatus == ReportStatus.approved ? DateTime.now() : null,
       );
 
       _isLoading = false;
@@ -338,7 +336,7 @@ class ReportProvider with ChangeNotifier {
     }
   }
 
-  // Delete report
+  // Delete report (for user - only if status is inProgress)
   Future<bool> deleteReport(String reportId) async {
     _isLoading = true;
     _errorMessage = null;
@@ -348,7 +346,23 @@ class ReportProvider with ChangeNotifier {
       // Simulate API call
       await Future.delayed(const Duration(seconds: 1));
 
-      _reports.removeWhere((r) => r.id == reportId);
+      final index = _reports.indexWhere((r) => r.id == reportId);
+      if (index == -1) {
+        _errorMessage = 'Laporan tidak ditemukan';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Check if report can be deleted (only inProgress status)
+      if (_reports[index].status != ReportStatus.inProgress) {
+        _errorMessage = 'Hanya laporan dengan status "Diproses" yang dapat dihapus';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      _reports.removeAt(index);
 
       _isLoading = false;
       notifyListeners();
@@ -384,7 +398,7 @@ class ReportProvider with ChangeNotifier {
         description: 'Terdapat beberapa kursi yang kakinya patah di ruang TI-201. Mohon segera diperbaiki.',
         category: ReportCategory.kerusakan,
         priority: ReportPriority.high,
-        status: ReportStatus.pending,
+        status: ReportStatus.inProgress,
         reporter: mockUser,
         location: LocationData(
           latitude: -7.9458,
@@ -420,7 +434,7 @@ class ReportProvider with ChangeNotifier {
         description: 'Toilet di lantai 2 perlu dibersihkan lebih sering.',
         category: ReportCategory.kebersihan,
         priority: ReportPriority.low,
-        status: ReportStatus.resolved,
+        status: ReportStatus.approved,
         reporter: mockUser,
         media: [],
         createdAt: DateTime.now().subtract(const Duration(days: 3)),
@@ -428,6 +442,19 @@ class ReportProvider with ChangeNotifier {
         approvedBy: 'admin-1',
         approvedAt: DateTime.now().subtract(const Duration(days: 2)),
         resolvedAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      Report(
+        id: '4',
+        title: 'Proyektor Error di Lab Multimedia',
+        description: 'Proyektor tidak dapat dinyalakan, perlu pengecekan teknis.',
+        category: ReportCategory.kerusakan,
+        priority: ReportPriority.urgent,
+        status: ReportStatus.rejected,
+        reporter: mockUser,
+        media: [],
+        adminNote: 'Sudah ditangani oleh pihak lab multimedia secara internal.',
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        updatedAt: DateTime.now().subtract(const Duration(hours: 12)),
       ),
     ];
   }

@@ -53,7 +53,7 @@ class Report {
       ),
       status: ReportStatus.values.firstWhere(
         (e) => e.name == json['status'],
-        orElse: () => ReportStatus.pending,
+        orElse: () => ReportStatus.inProgress,
       ),
       reporter: User.fromJson(json['reporter'] as Map<String, dynamic>),
       location: json['location'] != null
@@ -137,15 +137,15 @@ class Report {
   }
 
   bool get canBeEdited {
-    return status == ReportStatus.pending || status == ReportStatus.rejected;
+    return status == ReportStatus.inProgress;
   }
 
   bool get canBeApproved {
-    return status == ReportStatus.pending;
+    return status == ReportStatus.inProgress;
   }
 
   bool get canBeRejected {
-    return status == ReportStatus.pending || status == ReportStatus.approved;
+    return status == ReportStatus.inProgress;
   }
 
   bool get canBeResolved {
