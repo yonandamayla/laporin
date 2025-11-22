@@ -4,19 +4,25 @@ import 'package:laporin/models/enums.dart';
 import 'package:laporin/models/user_model.dart';
 import 'package:laporin/models/location_model.dart';
 import 'package:laporin/models/media_model.dart';
+import 'package:laporin/services/firestore_service.dart';
+import 'dart:async';
 
 class ReportProvider with ChangeNotifier {
+  final FirestoreService _firestoreService = FirestoreService();
+
   List<Report> _reports = [];
   Report? _selectedReport;
   bool _isLoading = false;
   String? _errorMessage;
-  
+  StreamSubscription? _reportsSubscription;
+
   // Filters
   ReportStatus? _filterStatus;
   ReportCategory? _filterCategory;
   String? _searchQuery;
 
   List<Report> get reports => _getFilteredReports();
+  List<Report> get allReports => _reports;
   Report? get selectedReport => _selectedReport;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -58,14 +64,25 @@ class ReportProvider with ChangeNotifier {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
-  // Get report statistics
+  // Get report statistics (sync - from cached data)
   Map<String, int> getReportStats() {
     return {
+      'all': _reports.length,
       'total': _reports.length,
       'inProgress': _reports.where((r) => r.status == ReportStatus.inProgress).length,
       'approved': _reports.where((r) => r.status == ReportStatus.approved).length,
       'rejected': _reports.where((r) => r.status == ReportStatus.rejected).length,
     };
+  }
+
+  // Get report statistics from Firestore (async)
+  Future<Map<String, int>> fetchReportStatsFromFirestore() async {
+    try {
+      return await _firestoreService.getReportStatistics();
+    } catch (e) {
+      // Return cached stats if Firestore fails
+      return getReportStats();
+    }
   }
 
   // Set filters
@@ -91,27 +108,41 @@ class ReportProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Fetch all reports
+  // Fetch all reports from Firestore
   Future<void> fetchReports() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
+      // Cancel existing subscription
+      await _reportsSubscription?.cancel();
 
-      // TODO: Replace with actual API call
-      // For now, generate mock data
-      _reports = _generateMockReports();
-
-      _isLoading = false;
-      notifyListeners();
+      // Listen to reports stream from Firestore
+      _reportsSubscription = _firestoreService.getReports().listen(
+        (reports) {
+          _reports = reports;
+          _isLoading = false;
+          notifyListeners();
+        },
+        onError: (e) {
+          _errorMessage = 'Gagal memuat laporan: $e';
+          _isLoading = false;
+          notifyListeners();
+        },
+      );
     } catch (e) {
-      _errorMessage = 'Gagal memuat laporan';
+      _errorMessage = 'Gagal memuat laporan: $e';
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Dispose subscription
+  @override
+  void dispose() {
+    _reportsSubscription?.cancel();
+    super.dispose();
   }
 
   // Fetch report by ID
@@ -121,20 +152,22 @@ class ReportProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(milliseconds: 500));
+      // First try from cache
+      final cachedReport = _reports.where((r) => r.id == id).firstOrNull;
+      if (cachedReport != null) {
+        _selectedReport = cachedReport;
+        _isLoading = false;
+        notifyListeners();
+        return _selectedReport;
+      }
 
-      // Find report
-      _selectedReport = _reports.firstWhere(
-        (r) => r.id == id,
-        orElse: () => _reports.first,
-      );
-
+      // Fetch from Firestore
+      _selectedReport = await _firestoreService.getReportById(id);
       _isLoading = false;
       notifyListeners();
       return _selectedReport;
     } catch (e) {
-      _errorMessage = 'Gagal memuat detail laporan';
+      _errorMessage = 'Gagal memuat detail laporan: $e';
       _isLoading = false;
       notifyListeners();
       return null;
@@ -156,11 +189,8 @@ class ReportProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
-
       final newReport = Report(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: '', // Will be assigned by Firestore
         title: title,
         description: description,
         category: category,
@@ -173,13 +203,14 @@ class ReportProvider with ChangeNotifier {
         updatedAt: DateTime.now(),
       );
 
-      _reports.insert(0, newReport);
+      // Create in Firestore
+      await _firestoreService.createReport(newReport);
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Gagal membuat laporan';
+      _errorMessage = 'Gagal membuat laporan: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -199,30 +230,19 @@ class ReportProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
+      final updates = <String, dynamic>{};
+      if (title != null) updates['title'] = title;
+      if (description != null) updates['description'] = description;
+      if (category != null) updates['category'] = category.name;
+      if (priority != null) updates['priority'] = priority.name;
 
-      final index = _reports.indexWhere((r) => r.id == reportId);
-      if (index == -1) {
-        _errorMessage = 'Laporan tidak ditemukan';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      _reports[index] = _reports[index].copyWith(
-        title: title,
-        description: description,
-        category: category,
-        priority: priority,
-        updatedAt: DateTime.now(),
-      );
+      await _firestoreService.updateReport(reportId, updates);
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Gagal mengupdate laporan';
+      _errorMessage = 'Gagal mengupdate laporan: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -236,29 +256,17 @@ class ReportProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-
-      final index = _reports.indexWhere((r) => r.id == reportId);
-      if (index == -1) {
-        _errorMessage = 'Laporan tidak ditemukan';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      _reports[index] = _reports[index].copyWith(
-        status: ReportStatus.approved,
-        approvedBy: adminId,
-        approvedAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+      await _firestoreService.updateReport(reportId, {
+        'status': ReportStatus.approved.name,
+        'approved_by': adminId,
+        'approved_at': DateTime.now().toIso8601String(),
+      });
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Gagal menyetujui laporan';
+      _errorMessage = 'Gagal menyetujui laporan: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -272,28 +280,16 @@ class ReportProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-
-      final index = _reports.indexWhere((r) => r.id == reportId);
-      if (index == -1) {
-        _errorMessage = 'Laporan tidak ditemukan';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      _reports[index] = _reports[index].copyWith(
-        status: ReportStatus.rejected,
-        adminNote: adminNote,
-        updatedAt: DateTime.now(),
-      );
+      await _firestoreService.updateReport(reportId, {
+        'status': ReportStatus.rejected.name,
+        'admin_note': adminNote,
+      });
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Gagal menolak laporan';
+      _errorMessage = 'Gagal menolak laporan: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -307,68 +303,37 @@ class ReportProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
+      await _firestoreService.updateReportStatus(reportId, newStatus);
 
-      final index = _reports.indexWhere((r) => r.id == reportId);
-      if (index == -1) {
-        _errorMessage = 'Laporan tidak ditemukan';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+      if (note != null) {
+        await _firestoreService.updateReport(reportId, {'admin_note': note});
       }
-
-      _reports[index] = _reports[index].copyWith(
-        status: newStatus,
-        adminNote: note,
-        updatedAt: DateTime.now(),
-        resolvedAt: newStatus == ReportStatus.approved ? DateTime.now() : null,
-      );
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Gagal mengupdate status laporan';
+      _errorMessage = 'Gagal mengupdate status laporan: $e';
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  // Delete report (for user - only if status is inProgress)
+  // Delete report
   Future<bool> deleteReport(String reportId) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 1));
-
-      final index = _reports.indexWhere((r) => r.id == reportId);
-      if (index == -1) {
-        _errorMessage = 'Laporan tidak ditemukan';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      // Check if report can be deleted (only inProgress status)
-      if (_reports[index].status != ReportStatus.inProgress) {
-        _errorMessage = 'Hanya laporan dengan status "Diproses" yang dapat dihapus';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      _reports.removeAt(index);
+      await _firestoreService.deleteReport(reportId);
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Gagal menghapus laporan';
+      _errorMessage = 'Gagal menghapus laporan: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -378,84 +343,5 @@ class ReportProvider with ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
-  }
-
-  // Generate mock data for testing
-  List<Report> _generateMockReports() {
-    final mockUser = User(
-      id: '1',
-      name: 'John Doe',
-      email: 'john@student.ac.id',
-      role: UserRole.mahasiswa,
-      nim: '2341720001',
-      createdAt: DateTime.now(),
-    );
-
-    return [
-      Report(
-        id: '1',
-        title: 'Kursi Rusak di Ruang TI-201',
-        description: 'Terdapat beberapa kursi yang kakinya patah di ruang TI-201. Mohon segera diperbaiki.',
-        category: ReportCategory.kerusakan,
-        priority: ReportPriority.high,
-        status: ReportStatus.inProgress,
-        reporter: mockUser,
-        location: LocationData(
-          latitude: -7.9458,
-          longitude: 112.6186,
-          buildingName: 'Gedung TI - Ruang 201',
-        ),
-        media: [],
-        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-        updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      Report(
-        id: '2',
-        title: 'Lampu Mati di Koridor Lantai 3',
-        description: 'Lampu di koridor lantai 3 gedung TI sudah mati sejak kemarin.',
-        category: ReportCategory.kerusakan,
-        priority: ReportPriority.medium,
-        status: ReportStatus.approved,
-        reporter: mockUser,
-        location: LocationData(
-          latitude: -7.9458,
-          longitude: 112.6186,
-          buildingName: 'Gedung TI - Lantai 3',
-        ),
-        media: [],
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        updatedAt: DateTime.now().subtract(const Duration(hours: 5)),
-        approvedBy: 'admin-1',
-        approvedAt: DateTime.now().subtract(const Duration(hours: 5)),
-      ),
-      Report(
-        id: '3',
-        title: 'Kebersihan Toilet Kurang Terjaga',
-        description: 'Toilet di lantai 2 perlu dibersihkan lebih sering.',
-        category: ReportCategory.kebersihan,
-        priority: ReportPriority.low,
-        status: ReportStatus.approved,
-        reporter: mockUser,
-        media: [],
-        createdAt: DateTime.now().subtract(const Duration(days: 3)),
-        updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-        approvedBy: 'admin-1',
-        approvedAt: DateTime.now().subtract(const Duration(days: 2)),
-        resolvedAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      Report(
-        id: '4',
-        title: 'Proyektor Error di Lab Multimedia',
-        description: 'Proyektor tidak dapat dinyalakan, perlu pengecekan teknis.',
-        category: ReportCategory.kerusakan,
-        priority: ReportPriority.urgent,
-        status: ReportStatus.rejected,
-        reporter: mockUser,
-        media: [],
-        adminNote: 'Sudah ditangani oleh pihak lab multimedia secara internal.',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-        updatedAt: DateTime.now().subtract(const Duration(hours: 12)),
-      ),
-    ];
   }
 }

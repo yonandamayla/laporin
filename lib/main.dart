@@ -54,7 +54,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
           final router = AppRouter(authProvider).router;
-          
+
           return MaterialApp.router(
             title: 'LaporJTI',
             debugShowCheckedModeBanner: false,

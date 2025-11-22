@@ -14,10 +14,18 @@ import 'package:laporin/models/report_model.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:io';
 
+// Helper class to store media with type
+class MediaItem {
+  final XFile file;
+  final MediaType type;
+
+  MediaItem({required this.file, required this.type});
+}
+
 class CreateReportScreen extends StatefulWidget {
-  final Report? report;
-  
-  const CreateReportScreen({super.key, this.report});
+  final Report? reportToEdit;
+
+  const CreateReportScreen({super.key, this.reportToEdit});
 
   @override
   State<CreateReportScreen> createState() => _CreateReportScreenState();
@@ -27,13 +35,16 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+
   ReportCategory _selectedCategory = ReportCategory.kerusakan;
   ReportPriority _selectedPriority = ReportPriority.medium;
   LocationData? _location;
-  final List<XFile> _images = [];
+  final List<MediaItem> _mediaItems = [];
   bool _isLoadingLocation = false;
   bool _isSubmitting = false;
+
+  int get _imageCount => _mediaItems.where((m) => m.type == MediaType.image).length;
+  int get _videoCount => _mediaItems.where((m) => m.type == MediaType.video).length;
 
   @override
   void initState() {
@@ -42,12 +53,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   }
 
   void _initializeFormForEdit() {
-    if (widget.report != null) {
-      _titleController.text = widget.report!.title;
-      _descriptionController.text = widget.report!.description;
-      _selectedCategory = widget.report!.category;
-      _selectedPriority = widget.report!.priority;
-      _location = widget.report!.location;
+    if (widget.reportToEdit != null) {
+      _titleController.text = widget.reportToEdit!.title;
+      _descriptionController.text = widget.reportToEdit!.description;
+      _selectedCategory = widget.reportToEdit!.category;
+      _selectedPriority = widget.reportToEdit!.priority;
+      _location = widget.reportToEdit!.location;
       // Note: Images dari report tidak bisa diedit untuk sederhananya
     }
   }
@@ -63,15 +74,18 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     try {
       final ImagePicker picker = ImagePicker();
       final List<XFile> selectedImages = await picker.pickMultiImage();
-      
+
       if (selectedImages.isNotEmpty) {
         setState(() {
-          _images.addAll(selectedImages);
-          if (_images.length > 5) {
-            _images.removeRange(5, _images.length);
+          for (var image in selectedImages) {
+            if (_mediaItems.length < 5) {
+              _mediaItems.add(MediaItem(file: image, type: MediaType.image));
+            }
+          }
+          if (_mediaItems.length >= 5) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Maksimal 5 gambar'),
+                content: Text('Maksimal 5 lampiran'),
                 backgroundColor: AppColors.warning,
               ),
             );
@@ -94,15 +108,15 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? photo = await picker.pickImage(source: ImageSource.camera);
-      
+
       if (photo != null) {
         setState(() {
-          if (_images.length < 5) {
-            _images.add(photo);
+          if (_mediaItems.length < 5) {
+            _mediaItems.add(MediaItem(file: photo, type: MediaType.image));
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Maksimal 5 gambar'),
+                content: Text('Maksimal 5 lampiran'),
                 backgroundColor: AppColors.warning,
               ),
             );
@@ -121,9 +135,74 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     }
   }
 
-  void _removeImage(int index) {
+  Future<void> _pickVideo() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+
+      if (video != null) {
+        setState(() {
+          if (_mediaItems.length < 5) {
+            _mediaItems.add(MediaItem(file: video, type: MediaType.video));
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Maksimal 5 lampiran'),
+                backgroundColor: AppColors.warning,
+              ),
+            );
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal memilih video'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _recordVideo() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? video = await picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(minutes: 2),
+      );
+
+      if (video != null) {
+        setState(() {
+          if (_mediaItems.length < 5) {
+            _mediaItems.add(MediaItem(file: video, type: MediaType.video));
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Maksimal 5 lampiran'),
+                backgroundColor: AppColors.warning,
+              ),
+            );
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal merekam video'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeMedia(int index) {
     setState(() {
-      _images.removeAt(index);
+      _mediaItems.removeAt(index);
     });
   }
 
@@ -245,10 +324,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       bool success;
 
       // Check if this is edit mode or create mode
-      if (widget.report != null) {
+      if (widget.reportToEdit != null) {
         // Edit mode - update existing report
         success = await reportProvider.updateReport(
-          widget.report!.id,
+          widget.reportToEdit!.id,
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
           category: _selectedCategory,
@@ -256,12 +335,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         );
       } else {
         // Create mode - create new report
-        // Convert images to MediaFile objects
-        final mediaFiles = _images
-            .map((image) => MediaFile(
+        // Convert media items to MediaFile objects
+        final mediaFiles = _mediaItems
+            .map((item) => MediaFile(
                   id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  url: image.path,
-                  type: MediaType.image,
+                  url: item.file.path,
+                  type: item.type,
                   uploadedAt: DateTime.now(),
                 ))
             .toList();
@@ -281,8 +360,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(widget.report != null 
-                  ? 'Laporan berhasil diupdate' 
+              content: Text(widget.reportToEdit != null
+                  ? 'Laporan berhasil diupdate'
                   : 'Laporan berhasil dibuat'),
               backgroundColor: AppColors.success,
             ),
@@ -291,9 +370,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(reportProvider.errorMessage ?? 
-                  (widget.report != null 
-                      ? 'Gagal mengupdate laporan' 
+              content: Text(reportProvider.errorMessage ??
+                  (widget.reportToEdit != null
+                      ? 'Gagal mengupdate laporan'
                       : 'Gagal membuat laporan')),
               backgroundColor: AppColors.error,
             ),
@@ -320,10 +399,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditMode = widget.reportToEdit != null;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.report != null ? 'Edit Laporan' : 'Buat Laporan',
+          isEditMode ? 'Edit Laporan' : 'Buat Laporan',
           style: AppTextStyles.h3.copyWith(color: AppColors.white),
         ),
         leading: IconButton(
@@ -577,10 +658,65 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 'Lampiran (Opsional)',
                 style: AppTextStyles.h3,
               ).animate().fadeIn(delay: 700.ms, duration: 300.ms),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
 
-              // Image Grid
-              if (_images.isNotEmpty)
+              // Media count info
+              if (_mediaItems.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      if (_imageCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.image, size: 14, color: AppColors.primary),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$_imageCount Foto',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (_imageCount > 0 && _videoCount > 0) const SizedBox(width: 8),
+                      if (_videoCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.videocam, size: 14, color: AppColors.error),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$_videoCount Video',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+              // Media Grid
+              if (_mediaItems.isNotEmpty)
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -589,24 +725,62 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: _images.length,
+                  itemCount: _mediaItems.length,
                   itemBuilder: (context, index) {
+                    final item = _mediaItems[index];
+                    final isVideo = item.type == MediaType.video;
+
                     return Stack(
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.file(
-                            File(_images[index].path),
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
+                          child: isVideo
+                              ? Container(
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  color: Colors.black87,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.play_circle_fill,
+                                      size: 40,
+                                      color: AppColors.white,
+                                    ),
+                                  ),
+                                )
+                              : Image.file(
+                                  File(item.file.path),
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
+                        // Video badge
+                        if (isVideo)
+                          Positioned(
+                            bottom: 4,
+                            left: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.error,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'VIDEO',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        // Remove button
                         Positioned(
                           top: 4,
                           right: 4,
                           child: InkWell(
-                            onTap: () => _removeImage(index),
+                            onTap: () => _removeMedia(index),
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
@@ -626,14 +800,19 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   },
                 ).animate().fadeIn(duration: 300.ms),
 
-              if (_images.isNotEmpty) const SizedBox(height: 12),
+              if (_mediaItems.isNotEmpty) const SizedBox(height: 12),
 
-              // Image Picker Buttons
+              // Media Picker Buttons - Photos
+              Text(
+                'Foto',
+                style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _images.length >= 5 ? null : _takePhoto,
+                      onPressed: _mediaItems.length >= 5 ? null : _takePhoto,
                       icon: const Icon(Icons.camera_alt),
                       label: const Text('Kamera'),
                       style: OutlinedButton.styleFrom(
@@ -644,7 +823,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _images.length >= 5 ? null : _pickImages,
+                      onPressed: _mediaItems.length >= 5 ? null : _pickImages,
                       icon: const Icon(Icons.photo_library),
                       label: const Text('Galeri'),
                       style: OutlinedButton.styleFrom(
@@ -655,14 +834,51 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 ],
               ).animate().fadeIn(delay: 800.ms, duration: 300.ms),
 
-              if (_images.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '${_images.length}/5 gambar',
-                    style: AppTextStyles.caption,
+              const SizedBox(height: 12),
+
+              // Media Picker Buttons - Videos
+              Text(
+                'Video',
+                style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _mediaItems.length >= 5 ? null : _recordVideo,
+                      icon: const Icon(Icons.videocam),
+                      label: const Text('Rekam'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(color: _mediaItems.length >= 5 ? AppColors.greyLight : AppColors.error),
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _mediaItems.length >= 5 ? null : _pickVideo,
+                      icon: const Icon(Icons.video_library),
+                      label: const Text('Galeri'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(color: _mediaItems.length >= 5 ? AppColors.greyLight : AppColors.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ).animate().fadeIn(delay: 850.ms, duration: 300.ms),
+
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '${_mediaItems.length}/5 lampiran (maks. video 2 menit)',
+                  style: AppTextStyles.caption,
                 ),
+              ),
 
               const SizedBox(height: 32),
 
@@ -685,7 +901,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           ),
                         )
                       : Text(
-                          widget.report != null ? 'Update Laporan' : 'Kirim Laporan',
+                          isEditMode ? 'Update Laporan' : 'Kirim Laporan',
                           style: AppTextStyles.button,
                         ),
                 ),

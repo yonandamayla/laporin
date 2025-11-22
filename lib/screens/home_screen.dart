@@ -228,7 +228,7 @@ class _DashboardPageState extends State<DashboardPage> {
         final filteredReports = _selectedFilter == 'Semua'
             ? reportProvider.reports
             : reportProvider.reports.where((report) {
-                if (_selectedFilter == 'Diproses') {
+                if (_selectedFilter == 'Diajukan') {
                   return report.status == ReportStatus.inProgress;
                 } else if (_selectedFilter == 'Disetujui') {
                   return report.status == ReportStatus.approved;
@@ -685,10 +685,10 @@ class _DashboardPageState extends State<DashboardPage> {
                       0,
                     ),
                     _buildCleanStatCard(
-                      'Diproses',
+                      'Diajukan',
                       stats['inProgress'].toString(),
-                      Icons.autorenew_rounded,
-                      AppColors.info,
+                      Icons.schedule_rounded,
+                      AppColors.warning,
                       1,
                     ),
                     _buildCleanStatCard(
@@ -763,7 +763,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       _buildFilterChip('Semua', Icons.all_inclusive),
                       const SizedBox(width: 10),
-                      _buildFilterChip('Diproses', Icons.autorenew_rounded),
+                      _buildFilterChip('Diajukan', Icons.schedule_rounded),
                       const SizedBox(width: 10),
                       _buildFilterChip('Disetujui', Icons.check_circle_rounded),
                       const SizedBox(width: 10),
@@ -798,10 +798,10 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildFilterChip(String label, IconData icon) {
     final isSelected = _selectedFilter == label;
     Color chipColor;
-    
+
     switch (label) {
-      case 'Diproses':
-        chipColor = AppColors.info;
+      case 'Diajukan':
+        chipColor = AppColors.warning;
         break;
       case 'Disetujui':
         chipColor = AppColors.success;
@@ -954,6 +954,13 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildReportCard(BuildContext context, report, int index) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final reportProvider = Provider.of<ReportProvider>(context, listen: false);
+    final currentUser = authProvider.currentUser;
+    final canModify = report.status.canBeModified &&
+                      currentUser != null &&
+                      report.reporter.id == currentUser.id;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -986,128 +993,336 @@ class _DashboardPageState extends State<DashboardPage> {
               width: 1,
             ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
             children: [
-              // Icon Container
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _getStatusColor(report.status).withOpacity(0.15),
-                      _getStatusColor(report.status).withOpacity(0.08),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    report.category.icon,
-                    style: const TextStyle(fontSize: 26),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              
-              // Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      report.title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Icon Container
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          _getStatusColor(report.status).withOpacity(0.15),
+                          _getStatusColor(report.status).withOpacity(0.08),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      report.description,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                    child: Center(
+                      child: Text(
+                        report.category.icon,
+                        style: const TextStyle(fontSize: 26),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 10),
-                    Row(
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                _getStatusColor(report.status),
-                                _getStatusColor(report.status).withOpacity(0.8),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(6),
+                        Text(
+                          report.title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
-                          child: Text(
-                            report.status.displayName,
-                            style: GoogleFonts.poppins(
-                              color: AppColors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.greyLight.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(6),
+                        const SizedBox(height: 6),
+                        Text(
+                          report.description,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _getPriorityIcon(report.priority),
-                                size: 11,
-                                color: AppColors.textSecondary,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    _getStatusColor(report.status),
+                                    _getStatusColor(report.status)
+                                        .withOpacity(0.8),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(6),
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                report.priority.displayName,
+                              child: Text(
+                                report.status.displayName,
                                 style: GoogleFonts.poppins(
+                                  color: AppColors.white,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.greyLight.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _getPriorityIcon(report.priority),
+                                    size: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    report.priority.displayName,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Menu Button for edit/delete (only if can modify)
+                  if (canModify)
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        color: AppColors.textSecondary.withOpacity(0.7),
+                        size: 20,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onSelected: (value) async {
+                        if (value == 'edit') {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  CreateReportScreen(reportToEdit: report),
+                            ),
+                          );
+                          if (result == true && context.mounted) {
+                            reportProvider.fetchReports();
+                          }
+                        } else if (value == 'delete') {
+                          _showDeleteConfirmation(context, report, reportProvider);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_rounded,
+                                  color: AppColors.primary, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Edit Laporan',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_rounded,
+                                  color: AppColors.error, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Hapus Laporan',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.error,
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ],
+                    )
+                  else
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary.withOpacity(0.5),
                     ),
-                  ],
+                ],
+              ),
+              // Info text for modifiable reports
+              if (canModify) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.warning.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 14, color: AppColors.warning),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Anda dapat mengedit atau menghapus laporan ini',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              
-              // Arrow Icon
-              const SizedBox(width: 8),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 14,
-                color: AppColors.textSecondary.withOpacity(0.5),
-              ),
+              ],
             ],
           ),
         ),
       ),
     ).animate(delay: Duration(milliseconds: index * 80))
-      .fadeIn(duration: 400.ms)
-      .slideX(begin: 0.1, end: 0, curve: Curves.easeOutQuart);
+        .fadeIn(duration: 400.ms)
+        .slideX(begin: 0.1, end: 0, curve: Curves.easeOutQuart);
+  }
+
+  void _showDeleteConfirmation(
+      BuildContext context, report, ReportProvider reportProvider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.warning_rounded, color: AppColors.error),
+            ),
+            const SizedBox(width: 12),
+            const Text('Hapus Laporan'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Apakah Anda yakin ingin menghapus laporan ini?',
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.error.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Text(report.category.icon, style: const TextStyle(fontSize: 24)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      report.title,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tindakan ini tidak dapat dibatalkan!',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: AppColors.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Batal',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final success = await reportProvider.deleteReport(report.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? 'Laporan berhasil dihapus'
+                          : 'Gagal menghapus laporan',
+                    ),
+                    backgroundColor:
+                        success ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Hapus',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -1166,7 +1381,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Color _getStatusColor(ReportStatus status) {
     switch (status) {
       case ReportStatus.inProgress:
-        return AppColors.info;
+        return AppColors.warning;
       case ReportStatus.approved:
         return AppColors.success;
       case ReportStatus.rejected:
@@ -1449,10 +1664,10 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildStatCard(
-                  icon: Icons.autorenew_rounded,
-                  label: 'Diproses',
+                  icon: Icons.schedule_rounded,
+                  label: 'Diajukan',
                   value: userInProgress.toString(),
-                  color: AppColors.info,
+                  color: AppColors.warning,
                 ).animate().fadeIn(delay: 200.ms, duration: 300.ms).scale(begin: Offset(0.8, 0.8), end: Offset(1, 1)),
               ),
             ],

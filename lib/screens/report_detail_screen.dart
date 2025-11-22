@@ -6,10 +6,13 @@ import 'package:laporin/providers/auth_provider.dart';
 import 'package:laporin/providers/report_provider.dart';
 import 'package:laporin/models/enums.dart';
 import 'package:laporin/models/report_model.dart';
+import 'package:laporin/models/media_model.dart';
 import 'package:laporin/screens/create_report_screen.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 import 'dart:io';
 
 class ReportDetailScreen extends StatefulWidget {
@@ -274,7 +277,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CreateReportScreen(report: _report),
+        builder: (context) => CreateReportScreen(reportToEdit: _report),
       ),
     );
 
@@ -654,19 +657,84 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Lokasi', style: AppTextStyles.h3),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 20, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        Text('Lokasi', style: AppTextStyles.h3),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.location_on, color: AppColors.error),
-                        title: Text(
-                          _report!.location!.displayText,
-                          style: AppTextStyles.body,
-                        ),
-                        subtitle: Text(
-                          'Lat: ${_report!.location!.latitude.toStringAsFixed(6)}, Lng: ${_report!.location!.longitude.toStringAsFixed(6)}',
-                          style: AppTextStyles.caption,
-                        ),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.place, color: AppColors.error),
+                            ),
+                            title: Text(
+                              _report!.location!.displayText,
+                              style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Lat: ${_report!.location!.latitude.toStringAsFixed(6)}',
+                                  style: AppTextStyles.caption,
+                                ),
+                                Text(
+                                  'Lng: ${_report!.location!.longitude.toStringAsFixed(6)}',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          InkWell(
+                            onTap: _openInMaps,
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.05),
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(12),
+                                  bottomRight: Radius.circular(12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.map_rounded, color: AppColors.primary, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Buka di Google Maps',
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.open_in_new, color: AppColors.primary, size: 16),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -686,20 +754,71 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     Row(
                       children: [
                         const Icon(
-                          Icons.image,
+                          Icons.attach_file,
                           size: 20,
                           color: AppColors.primary,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Foto Lampiran (${_report!.media.length})',
+                          'Lampiran (${_report!.media.length})',
                           style: AppTextStyles.h3,
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
+                    // Show counts for images and videos
+                    Row(
+                      children: [
+                        if (_report!.media.where((m) => m.type == MediaType.image).isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.image, size: 14, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_report!.media.where((m) => m.type == MediaType.image).length} Foto',
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        if (_report!.media.where((m) => m.type == MediaType.video).isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.videocam, size: 14, color: AppColors.error),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_report!.media.where((m) => m.type == MediaType.video).length} Video',
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     Text(
-                      'Tap gambar untuk memperbesar',
+                      'Tap untuk memperbesar/memutar',
                       style: AppTextStyles.caption.copyWith(
                         color: AppColors.textSecondary,
                         fontStyle: FontStyle.italic,
@@ -713,17 +832,25 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         itemCount: _report!.media.length,
                         itemBuilder: (context, index) {
                           final media = _report!.media[index];
+                          final isVideo = media.type == MediaType.video;
+
                           return Padding(
                             padding: const EdgeInsets.only(right: 12),
                             child: GestureDetector(
-                              onTap: () => _showImageFullScreen(context, media.url, index),
+                              onTap: () {
+                                if (isVideo) {
+                                  _showVideoPlayer(context, media.url, index);
+                                } else {
+                                  _showImageFullScreen(context, media.url, index);
+                                }
+                              },
                               child: Hero(
-                                tag: 'image_$index',
+                                tag: 'media_$index',
                                 child: Container(
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: AppColors.greyLight,
+                                      color: isVideo ? AppColors.error : AppColors.greyLight,
                                       width: 2,
                                     ),
                                     boxShadow: [
@@ -738,24 +865,38 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                     borderRadius: BorderRadius.circular(10),
                                     child: Stack(
                                       children: [
-                                        Image.file(
-                                          File(media.url),
-                                          width: 150,
-                                          height: 150,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container(
-                                              width: 150,
-                                              height: 150,
-                                              color: AppColors.greyLight,
-                                              child: const Icon(
-                                                Icons.broken_image,
-                                                size: 48,
-                                                color: AppColors.greyDark,
+                                        if (isVideo)
+                                          Container(
+                                            width: 150,
+                                            height: 150,
+                                            color: Colors.black87,
+                                            child: const Center(
+                                              child: Icon(
+                                                Icons.play_circle_fill,
+                                                size: 64,
+                                                color: AppColors.white,
                                               ),
-                                            );
-                                          },
-                                        ),
+                                            ),
+                                          )
+                                        else
+                                          Image.file(
+                                            File(media.url),
+                                            width: 150,
+                                            height: 150,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 150,
+                                                height: 150,
+                                                color: AppColors.greyLight,
+                                                child: const Icon(
+                                                  Icons.broken_image,
+                                                  size: 48,
+                                                  color: AppColors.greyDark,
+                                                ),
+                                              );
+                                            },
+                                          ),
                                         Positioned(
                                           top: 8,
                                           right: 8,
@@ -771,8 +912,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                const Icon(
-                                                  Icons.zoom_in,
+                                                Icon(
+                                                  isVideo ? Icons.videocam : Icons.zoom_in,
                                                   color: AppColors.white,
                                                   size: 14,
                                                 ),
@@ -789,6 +930,30 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                             ),
                                           ),
                                         ),
+                                        // Video indicator
+                                        if (isVideo)
+                                          Positioned(
+                                            bottom: 8,
+                                            left: 8,
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.error,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                'VIDEO',
+                                                style: AppTextStyles.caption.copyWith(
+                                                  color: AppColors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -1012,11 +1177,42 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   Color _getStatusColor(ReportStatus status) {
     switch (status) {
       case ReportStatus.inProgress:
-        return AppColors.info;
+        return AppColors.warning;
       case ReportStatus.approved:
         return AppColors.success;
       case ReportStatus.rejected:
         return AppColors.error;
+    }
+  }
+
+  Future<void> _openInMaps() async {
+    if (_report?.location == null) return;
+
+    final lat = _report!.location!.latitude;
+    final lng = _report!.location!.longitude;
+
+    // Try Google Maps first
+    final googleMapsUrl = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+
+    if (await canLaunchUrl(googleMapsUrl)) {
+      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+    } else {
+      // Fallback to general geo: URI
+      final geoUrl = Uri.parse('geo:$lat,$lng');
+      if (await canLaunchUrl(geoUrl)) {
+        await launchUrl(geoUrl);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tidak dapat membuka aplikasi peta'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -1042,6 +1238,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   }
 
   void _showImageFullScreen(BuildContext context, String imagePath, int initialIndex) {
+    // Filter only images
+    final images = _report!.media.where((m) => m.type == MediaType.image).toList();
+    final imageIndex = images.indexWhere((m) => m.url == imagePath);
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1051,7 +1251,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             backgroundColor: Colors.black,
             foregroundColor: AppColors.white,
             title: Text(
-              'Foto ${initialIndex + 1} dari ${_report!.media.length}',
+              'Foto ${imageIndex + 1} dari ${images.length}',
               style: AppTextStyles.bodyLarge.copyWith(color: AppColors.white),
             ),
             actions: [
@@ -1062,20 +1262,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             ],
           ),
           body: PageView.builder(
-            controller: PageController(initialPage: initialIndex),
-            itemCount: _report!.media.length,
-            onPageChanged: (index) {
-              // Update title when page changes
-            },
+            controller: PageController(initialPage: imageIndex >= 0 ? imageIndex : 0),
+            itemCount: images.length,
             itemBuilder: (context, index) {
               return Center(
                 child: Hero(
-                  tag: 'image_$index',
+                  tag: 'media_$index',
                   child: InteractiveViewer(
                     minScale: 0.5,
                     maxScale: 4.0,
                     child: Image.file(
-                      File(_report!.media[index].url),
+                      File(images[index].url),
                       fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
                         return Column(
@@ -1103,6 +1300,153 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  void _showVideoPlayer(BuildContext context, String videoPath, int index) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _VideoPlayerScreen(videoPath: videoPath),
+      ),
+    );
+  }
+}
+
+// Video Player Screen
+class _VideoPlayerScreen extends StatefulWidget {
+  final String videoPath;
+
+  const _VideoPlayerScreen({required this.videoPath});
+
+  @override
+  State<_VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+}
+
+class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      _controller = VideoPlayerController.file(File(widget.videoPath));
+      await _controller.initialize();
+      setState(() {
+        _isInitialized = true;
+      });
+      _controller.play();
+    } catch (e) {
+      setState(() {
+        _hasError = true;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: AppColors.white,
+        title: Text(
+          'Video',
+          style: AppTextStyles.bodyLarge.copyWith(color: AppColors.white),
+        ),
+      ),
+      body: Center(
+        child: _hasError
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppColors.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Video tidak dapat diputar',
+                    style: AppTextStyles.body.copyWith(color: AppColors.white),
+                  ),
+                ],
+              )
+            : !_isInitialized
+                ? const CircularProgressIndicator(color: AppColors.white)
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AspectRatio(
+                        aspectRatio: _controller.value.aspectRatio,
+                        child: VideoPlayer(_controller),
+                      ),
+                      const SizedBox(height: 16),
+                      // Video controls
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              _controller.value.isPlaying
+                                  ? Icons.pause_circle_filled
+                                  : Icons.play_circle_filled,
+                              color: AppColors.white,
+                              size: 48,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                if (_controller.value.isPlaying) {
+                                  _controller.pause();
+                                } else {
+                                  _controller.play();
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 16),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.replay,
+                              color: AppColors.white,
+                              size: 32,
+                            ),
+                            onPressed: () {
+                              _controller.seekTo(Duration.zero);
+                              _controller.play();
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Progress indicator
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: VideoProgressIndicator(
+                          _controller,
+                          allowScrubbing: true,
+                          colors: const VideoProgressColors(
+                            playedColor: AppColors.primary,
+                            bufferedColor: AppColors.greyLight,
+                            backgroundColor: AppColors.greyDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
       ),
     );
   }

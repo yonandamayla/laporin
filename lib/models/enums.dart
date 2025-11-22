@@ -82,14 +82,14 @@ enum ReportCategory {
 
 // Report Status Enum
 enum ReportStatus {
-  inProgress,
-  approved,
-  rejected;
+  inProgress, // Status awal saat laporan dibuat (Diajukan)
+  approved,   // Laporan disetujui oleh admin
+  rejected;   // Laporan ditolak oleh admin
 
   String get displayName {
     switch (this) {
       case ReportStatus.inProgress:
-        return 'Diproses';
+        return 'Diajukan';
       case ReportStatus.approved:
         return 'Disetujui';
       case ReportStatus.rejected:
@@ -97,15 +97,31 @@ enum ReportStatus {
     }
   }
 
+  String get description {
+    switch (this) {
+      case ReportStatus.inProgress:
+        return 'Laporan sedang menunggu persetujuan';
+      case ReportStatus.approved:
+        return 'Laporan telah disetujui';
+      case ReportStatus.rejected:
+        return 'Laporan ditolak';
+    }
+  }
+
   String get color {
     switch (this) {
       case ReportStatus.inProgress:
-        return 'info';
+        return 'warning'; // Orange/kuning untuk menunggu
       case ReportStatus.approved:
         return 'success';
       case ReportStatus.rejected:
         return 'error';
     }
+  }
+
+  // Check if report can be edited/deleted by user
+  bool get canBeModified {
+    return this == ReportStatus.inProgress;
   }
 }
 

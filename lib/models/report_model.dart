@@ -1,7 +1,42 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:laporin/models/enums.dart';
 import 'package:laporin/models/location_model.dart';
 import 'package:laporin/models/media_model.dart';
 import 'package:laporin/models/user_model.dart';
+
+// Helper function to parse DateTime from Firestore Timestamp or String
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) {
+    return DateTime.now();
+  }
+  if (value is Timestamp) {
+    return value.toDate();
+  }
+  if (value is String) {
+    return DateTime.parse(value);
+  }
+  if (value is DateTime) {
+    return value;
+  }
+  return DateTime.now();
+}
+
+// Helper function to parse nullable DateTime
+DateTime? _parseNullableDateTime(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is Timestamp) {
+    return value.toDate();
+  }
+  if (value is String) {
+    return DateTime.parse(value);
+  }
+  if (value is DateTime) {
+    return value;
+  }
+  return null;
+}
 
 class Report {
   final String id;
@@ -40,9 +75,9 @@ class Report {
 
   factory Report.fromJson(Map<String, dynamic> json) {
     return Report(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String,
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
       category: ReportCategory.values.firstWhere(
         (e) => e.name == json['category'],
         orElse: () => ReportCategory.lainnya,
@@ -55,7 +90,9 @@ class Report {
         (e) => e.name == json['status'],
         orElse: () => ReportStatus.inProgress,
       ),
-      reporter: User.fromJson(json['reporter'] as Map<String, dynamic>),
+      reporter: json['reporter'] != null
+          ? User.fromJson(json['reporter'] as Map<String, dynamic>)
+          : User(id: '', name: 'Unknown', email: '', role: UserRole.mahasiswa, createdAt: DateTime.now()),
       location: json['location'] != null
           ? LocationData.fromJson(json['location'] as Map<String, dynamic>)
           : null,
@@ -63,16 +100,12 @@ class Report {
               ?.map((e) => MediaFile.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _parseDateTime(json['created_at']),
+      updatedAt: _parseDateTime(json['updated_at']),
       adminNote: json['admin_note'] as String?,
       approvedBy: json['approved_by'] as String?,
-      approvedAt: json['approved_at'] != null
-          ? DateTime.parse(json['approved_at'] as String)
-          : null,
-      resolvedAt: json['resolved_at'] != null
-          ? DateTime.parse(json['resolved_at'] as String)
-          : null,
+      approvedAt: _parseNullableDateTime(json['approved_at']),
+      resolvedAt: _parseNullableDateTime(json['resolved_at']),
     );
   }
 

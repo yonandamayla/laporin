@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:laporin/constants/colors.dart';
 import 'package:laporin/services/firestore_service.dart';
+import 'package:laporin/services/firebase_auth_service.dart';
 import 'package:laporin/models/enums.dart';
 
 class UserManagementScreen extends StatefulWidget {
@@ -12,6 +13,7 @@ class UserManagementScreen extends StatefulWidget {
 
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
   List<Map<String, dynamic>> _users = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -70,10 +72,15 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _showAddUserDialog() {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
     final nimController = TextEditingController();
     final nipController = TextEditingController();
     final phoneController = TextEditingController();
     UserRole selectedRole = UserRole.mahasiswa;
+    bool isPasswordVisible = false;
+    bool isConfirmPasswordVisible = false;
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
@@ -87,25 +94,68 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 TextField(
                   controller: nameController,
                   decoration: const InputDecoration(
-                    labelText: 'Nama Lengkap',
+                    labelText: 'Nama Lengkap *',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: emailController,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
+                    labelText: 'Email *',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email),
                   ),
                   keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passwordController,
+                  obscureText: !isPasswordVisible,
+                  decoration: InputDecoration(
+                    labelText: 'Password *',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          isPasswordVisible = !isPasswordVisible;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: !isConfirmPasswordVisible,
+                  decoration: InputDecoration(
+                    labelText: 'Konfirmasi Password *',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          isConfirmPasswordVisible = !isConfirmPasswordVisible;
+                        });
+                      },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<UserRole>(
                   value: selectedRole,
                   decoration: const InputDecoration(
-                    labelText: 'Role',
+                    labelText: 'Role *',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.badge),
                   ),
                   items: [UserRole.mahasiswa, UserRole.dosen]
                       .map((role) => DropdownMenuItem(
@@ -126,8 +176,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   TextField(
                     controller: nimController,
                     decoration: const InputDecoration(
-                      labelText: 'NIM',
+                      labelText: 'NIM *',
                       border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.numbers),
                     ),
                     keyboardType: TextInputType.number,
                   ),
@@ -135,8 +186,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   TextField(
                     controller: nipController,
                     decoration: const InputDecoration(
-                      labelText: 'NIP',
+                      labelText: 'NIP *',
                       border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.numbers),
                     ),
                     keyboardType: TextInputType.number,
                   ),
@@ -146,6 +198,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Telepon (Opsional)',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.phone),
                   ),
                   keyboardType: TextInputType.phone,
                 ),
@@ -154,59 +207,131 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: isSubmitting ? null : () => Navigator.pop(context),
               child: const Text('Batal'),
             ),
             ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.isEmpty ||
-                    emailController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Nama dan email harus diisi'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                  return;
-                }
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      // Validation
+                      if (nameController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Nama harus diisi'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
 
-                try {
-                  await _firestoreService.createUser({
-                    'name': nameController.text,
-                    'email': emailController.text,
-                    'role': selectedRole.name,
-                    'nim': selectedRole == UserRole.mahasiswa
-                        ? nimController.text
-                        : null,
-                    'nip':
-                        selectedRole == UserRole.dosen ? nipController.text : null,
-                    'phone': phoneController.text.isNotEmpty
-                        ? phoneController.text
-                        : null,
-                  });
+                      if (emailController.text.isEmpty ||
+                          !_isValidEmail(emailController.text)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Email tidak valid'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
 
-                  if (mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('User berhasil ditambahkan'),
-                        backgroundColor: AppColors.success,
-                      ),
-                    );
-                    _loadUsers();
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Gagal menambahkan user: $e'),
-                        backgroundColor: AppColors.error,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Simpan'),
+                      if (passwordController.text.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Password minimal 6 karakter'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (passwordController.text !=
+                          confirmPasswordController.text) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Password tidak cocok'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (selectedRole == UserRole.mahasiswa &&
+                          nimController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('NIM harus diisi untuk mahasiswa'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (selectedRole == UserRole.dosen &&
+                          nipController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('NIP harus diisi untuk dosen'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() {
+                        isSubmitting = true;
+                      });
+
+                      try {
+                        // Create user with Firebase Auth
+                        await _authService.registerWithEmailAndPassword(
+                          email: emailController.text,
+                          password: passwordController.text,
+                          name: nameController.text,
+                          role: selectedRole,
+                          nim: selectedRole == UserRole.mahasiswa
+                              ? nimController.text
+                              : null,
+                          nip: selectedRole == UserRole.dosen
+                              ? nipController.text
+                              : null,
+                          phone: phoneController.text.isNotEmpty
+                              ? phoneController.text
+                              : null,
+                        );
+
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('User berhasil ditambahkan'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                          _loadUsers();
+                        }
+                      } catch (e) {
+                        setDialogState(() {
+                          isSubmitting = false;
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Gagal menambahkan user: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Simpan'),
             ),
           ],
         ),
@@ -214,133 +339,300 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
   }
 
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return emailRegex.hasMatch(email);
+  }
+
   void _showEditUserDialog(Map<String, dynamic> user) {
     final nameController = TextEditingController(text: user['name']);
     final emailController = TextEditingController(text: user['email']);
     final phoneController = TextEditingController(text: user['phone'] ?? '');
+    final nimController = TextEditingController(text: user['nim'] ?? '');
+    final nipController = TextEditingController(text: user['nip'] ?? '');
+    final role = UserRole.values.firstWhere(
+      (e) => e.name == user['role'],
+      orElse: () => UserRole.mahasiswa,
+    );
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit User'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Lengkap',
-                  border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit User'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama Lengkap *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email),
+                    helperText: 'Email tidak dapat diubah',
+                  ),
+                  enabled: false,
                 ),
-                enabled: false,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Telepon',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                // Show role badge (read only)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.badge, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Role: ${role.displayName}',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
                 ),
-                keyboardType: TextInputType.phone,
-              ),
-            ],
+                const SizedBox(height: 12),
+                if (role == UserRole.mahasiswa)
+                  TextField(
+                    controller: nimController,
+                    decoration: const InputDecoration(
+                      labelText: 'NIM',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.numbers),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                if (role == UserRole.dosen)
+                  TextField(
+                    controller: nipController,
+                    decoration: const InputDecoration(
+                      labelText: 'NIP',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.numbers),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Telepon',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _firestoreService.updateUser(user['id'], {
-                  'name': nameController.text,
-                  'phone': phoneController.text.isNotEmpty
-                      ? phoneController.text
-                      : null,
-                });
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (nameController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Nama harus diisi'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                        return;
+                      }
 
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('User berhasil diupdate'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                  _loadUsers();
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal update user: $e'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
+                      setDialogState(() {
+                        isSubmitting = true;
+                      });
+
+                      try {
+                        await _firestoreService.updateUser(user['id'], {
+                          'name': nameController.text,
+                          'phone': phoneController.text.isNotEmpty
+                              ? phoneController.text
+                              : null,
+                          'nim': role == UserRole.mahasiswa
+                              ? nimController.text
+                              : null,
+                          'nip': role == UserRole.dosen
+                              ? nipController.text
+                              : null,
+                        });
+
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('User berhasil diupdate'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                          _loadUsers();
+                        }
+                      } catch (e) {
+                        setDialogState(() {
+                          isSubmitting = false;
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Gagal update user: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Simpan'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _showDeleteConfirmation(Map<String, dynamic> user) {
+    bool isDeleting = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Konfirmasi Hapus'),
-        content: Text('Apakah Anda yakin ingin menghapus ${user['name']}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning, color: AppColors.error),
+              SizedBox(width: 8),
+              Text('Konfirmasi Hapus'),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _firestoreService.deleteUser(user['id']);
-
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('User berhasil dihapus'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                  _loadUsers();
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Gagal menghapus user: $e'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Apakah Anda yakin ingin menghapus user berikut?'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
                       backgroundColor: AppColors.error,
+                      child: Icon(Icons.person, color: Colors.white),
                     ),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: const Text('Hapus'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user['name'] ?? 'Unknown',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            user['email'] ?? '-',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Tindakan ini tidak dapat dibatalkan!',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: isDeleting ? null : () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: isDeleting
+                  ? null
+                  : () async {
+                      setDialogState(() {
+                        isDeleting = true;
+                      });
+
+                      try {
+                        await _firestoreService.deleteUser(user['id']);
+
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('User berhasil dihapus'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                          _loadUsers();
+                        }
+                      } catch (e) {
+                        setDialogState(() {
+                          isDeleting = false;
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Gagal menghapus user: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+              ),
+              child: isDeleting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Hapus'),
+            ),
+          ],
+        ),
       ),
     );
   }

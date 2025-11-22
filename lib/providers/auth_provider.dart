@@ -381,7 +381,16 @@ class AuthProvider with ChangeNotifier {
       }
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      // Only remove auth-related keys, preserve onboarding status
+      await prefs.remove('user_id');
+      await prefs.remove('user_email');
+      await prefs.remove('user_name');
+      await prefs.remove('user_role');
+      await prefs.remove('user_nim');
+      await prefs.remove('user_nip');
+      await prefs.remove('user_phone');
+      await prefs.remove('user_avatar');
+      await prefs.remove('use_firebase');
 
       _currentUser = null;
       _status = AuthStatus.unauthenticated;

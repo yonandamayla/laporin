@@ -26,8 +26,8 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Report.fromJson({
-                  'id': doc.id,
                   ...doc.data(),
+                  'id': doc.id, // Set AFTER spread to ensure correct doc ID
                 }))
             .toList());
   }
@@ -41,8 +41,8 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Report.fromJson({
-                  'id': doc.id,
                   ...doc.data(),
+                  'id': doc.id,
                 }))
             .toList());
   }
@@ -56,8 +56,8 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Report.fromJson({
-                  'id': doc.id,
                   ...doc.data(),
+                  'id': doc.id,
                 }))
             .toList());
   }
@@ -68,8 +68,8 @@ class FirestoreService {
       final doc = await _firestore.collection('reports').doc(reportId).get();
       if (doc.exists) {
         return Report.fromJson({
-          'id': doc.id,
           ...doc.data()!,
+          'id': doc.id,
         });
       }
       return null;
@@ -115,8 +115,8 @@ class FirestoreService {
       final snapshot = await _firestore.collection('reports').get();
       final reports = snapshot.docs
           .map((doc) => Report.fromJson({
-                'id': doc.id,
                 ...doc.data(),
+                'id': doc.id,
               }))
           .toList();
 
@@ -139,8 +139,8 @@ class FirestoreService {
       final doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {
         return User.fromJson({
-          'id': doc.id,
           ...doc.data()!,
+          'id': doc.id,
         });
       }
       return null;
@@ -157,8 +157,8 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => User.fromJson({
-                  'id': doc.id,
                   ...doc.data(),
+                  'id': doc.id,
                 }))
             .toList());
   }
@@ -172,8 +172,8 @@ class FirestoreService {
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => User.fromJson({
-                  'id': doc.id,
                   ...doc.data(),
+                  'id': doc.id,
                 }))
             .toList());
   }
@@ -196,8 +196,8 @@ class FirestoreService {
 
       final reports = snapshot.docs
           .map((doc) => Report.fromJson({
-                'id': doc.id,
                 ...doc.data(),
+                'id': doc.id,
               }))
           .toList();
 
