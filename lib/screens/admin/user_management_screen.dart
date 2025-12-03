@@ -6,7 +6,8 @@ import 'package:laporin/providers/auth_provider.dart';
 import 'package:laporin/models/enums.dart';
 
 class UserManagementScreen extends StatefulWidget {
-  const UserManagementScreen({super.key});
+  final bool showAppBar;
+  const UserManagementScreen({super.key, this.showAppBar = true});
 
   @override
   State<UserManagementScreen> createState() => _UserManagementScreenState();
@@ -66,11 +67,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           builder: (context, userProvider, child) {
             return Scaffold(
               backgroundColor: AppColors.background,
-              appBar: AppBar(
+              appBar: widget.showAppBar ? AppBar(
                 title: const Text('Admin Panel'),
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-              ),
+              ) : null,
               body: _buildBody(context, userProvider),
             );
           },
@@ -150,7 +151,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.background, // Changed from Colors.white untuk testing hot reload
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
@@ -465,7 +466,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
   }
 
-  Widget _buildAddUserAndFilterSection(BuildContext context, UserManagementProvider userProvider) {
+  Widget _buildAddUserAndFilterSection(
+    BuildContext context,
+    UserManagementProvider userProvider,
+  ) {
     return Row(
       children: [
         // Left side: Tambahkan User with + button
@@ -497,40 +501,48 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ),
         const Spacer(),
         // Right side: Filter dropdown
-        Row(
-          children: [
-            const Text(
-              'Filter:',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
+        Theme(
+          data: Theme.of(context).copyWith(
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
+          child: DropdownButton<String>(
+            value: userProvider.currentFilter ?? 'all',
+            underline: const SizedBox(),
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              color: AppColors.primary,
+              size: 16,
             ),
-            const SizedBox(width: 8),
-            DropdownButton<String>(
-              value: userProvider.currentFilter ?? 'all',
-              underline: const SizedBox(),
-              icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary, size: 16),
-              style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('Semua')),
-                DropdownMenuItem(value: 'verified', child: Text('Terverifikasi')),
-                DropdownMenuItem(value: 'public', child: Text('User Publik')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    userProvider.filterByStatus(value);
-                  }
-                },
-              ),
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+            focusColor: Colors.transparent,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Semua')),
+            DropdownMenuItem(value: 'verified', child: Text('Terverifikasi')),
+            DropdownMenuItem(value: 'public', child: Text('User Publik')),
           ],
+          onChanged: (value) {
+            if (value != null) {
+              userProvider.filterByStatus(value);
+            }
+          },
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSearchSection(BuildContext context, UserManagementProvider userProvider) {
+  Widget _buildSearchSection(
+    BuildContext context,
+    UserManagementProvider userProvider,
+  ) {
     return TextField(
       decoration: InputDecoration(
         hintText: 'Cari nama, email, NIM, atau NIP...',
@@ -552,7 +564,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
       ),
       style: const TextStyle(fontSize: 14),
       onChanged: (value) => userProvider.searchUsers(value),
