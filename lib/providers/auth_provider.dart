@@ -340,7 +340,11 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Save admin credentials for remember me functionality
-  Future<void> saveAdminCredentials(String email, String password, bool remember) async {
+  Future<void> saveAdminCredentials(
+    String email,
+    String password,
+    bool remember,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     if (remember) {
       await prefs.setString('admin_email', email);
@@ -433,7 +437,7 @@ class AuthProvider with ChangeNotifier {
       await prefs.remove('user_phone');
       await prefs.remove('user_avatar');
       await prefs.remove('use_firebase');
-      
+
       // Clear admin credentials if not remembering
       final rememberAdmin = prefs.getBool('admin_remember') ?? false;
       if (!rememberAdmin) {
@@ -679,7 +683,11 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Login Admin using Firestore data (no Firebase Auth)
-  Future<bool> loginAdmin(String email, String password, {bool rememberMe = false}) async {
+  Future<bool> loginAdmin(
+    String email,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -731,10 +739,10 @@ class AuthProvider with ChangeNotifier {
       );
 
       await _saveUserData(_currentUser!);
-      
+
       // Save credentials if remember me is enabled
       await saveAdminCredentials(email, password, rememberMe);
-      
+
       _status = AuthStatus.authenticated;
       _useFirebase = false;
       _isLoading = false;
@@ -754,10 +762,10 @@ class AuthProvider with ChangeNotifier {
         );
 
         await _saveUserData(_currentUser!);
-        
+
         // Save credentials if remember me is enabled
         await saveAdminCredentials(email, password, rememberMe);
-        
+
         _status = AuthStatus.authenticated;
         _useFirebase = false;
         _isLoading = false;

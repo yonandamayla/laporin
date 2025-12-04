@@ -183,9 +183,22 @@ class FirestoreService {
   // Update user
   Future<void> updateUser(String userId, Map<String, dynamic> updates) async {
     try {
+      updates['updated_at'] = FieldValue.serverTimestamp();
       await _firestore.collection('users').doc(userId).update(updates);
     } catch (e) {
       throw 'Gagal memperbarui user: $e';
+    }
+  }
+
+  // Update user password (Admin only)
+  Future<void> updateUserPassword(String userId, String newPassword) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'password': newPassword, // Note: Should be hashed in production
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw 'Gagal memperbarui password user: $e';
     }
   }
 
@@ -272,9 +285,7 @@ class FirestoreService {
   }
 
   // Get admin by email
-  Future<List<Map<String, dynamic>>> getAdminByEmail(
-    String email,
-  ) async {
+  Future<List<Map<String, dynamic>>> getAdminByEmail(String email) async {
     try {
       final snapshot = await _firestore
           .collection('admins')

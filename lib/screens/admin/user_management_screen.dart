@@ -922,6 +922,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final phoneController = TextEditingController(text: user['phone'] ?? '');
     final nimController = TextEditingController(text: user['nim'] ?? '');
     final nipController = TextEditingController(text: user['nip'] ?? '');
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isPasswordVisible = false;
+    bool isConfirmPasswordVisible = false;
+    bool changePassword = false;
 
     UserRole currentRole = UserRole.values.firstWhere(
       (r) => r.name == user['role'],
@@ -1037,6 +1042,100 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                     keyboardType: TextInputType.phone,
                   ),
+                  const SizedBox(height: 16),
+                  // Password change section
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: changePassword,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            changePassword = value ?? false;
+                            if (!changePassword) {
+                              passwordController.clear();
+                              confirmPasswordController.clear();
+                            }
+                          });
+                        },
+                      ),
+                      const Text(
+                        'Ubah Password',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (changePassword) ...[
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: !isPasswordVisible,
+                      decoration: InputDecoration(
+                        labelText: 'Password Baru *',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            isPasswordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              isPasswordVisible = !isPasswordVisible;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (value) {
+                        if (changePassword) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password tidak boleh kosong';
+                          }
+                          if (value.length < 6) {
+                            return 'Password minimal 6 karakter';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: confirmPasswordController,
+                      obscureText: !isConfirmPasswordVisible,
+                      decoration: InputDecoration(
+                        labelText: 'Konfirmasi Password *',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            isConfirmPasswordVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              isConfirmPasswordVisible =
+                                  !isConfirmPasswordVisible;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (value) {
+                        if (changePassword) {
+                          if (value == null || value.isEmpty) {
+                            return 'Konfirmasi password tidak boleh kosong';
+                          }
+                          if (value != passwordController.text) {
+                            return 'Password tidak cocok';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1080,6 +1179,15 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                             user['id'],
                             updateData,
                           );
+
+                          // Update password if requested
+                          if (success && changePassword) {
+                            success = await userProvider.updateUserPassword(
+                              user['id'],
+                              user['email'],
+                              passwordController.text,
+                            );
+                          }
                         }
 
                         if (success && context.mounted) {
