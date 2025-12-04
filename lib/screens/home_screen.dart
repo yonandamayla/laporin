@@ -271,27 +271,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            leading: Builder(
-              builder: (context) => IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.white.withOpacity(0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.menu_rounded,
-                    color: AppColors.white,
-                    size: 24,
-                  ),
-                ),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
+            
             title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -437,7 +417,6 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(width: 8),
             ],
           ),
-          drawer: const ProfileDrawer(),
           body: RefreshIndicator(
             onRefresh: () => reportProvider.fetchReports(),
             color: AppColors.primary,
