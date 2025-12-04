@@ -7,6 +7,7 @@ import 'package:laporin/screens/onboarding_screen.dart';
 import 'package:laporin/screens/login_selection_screen.dart';
 import 'package:laporin/screens/user_login_screen.dart';
 import 'package:laporin/screens/admin_login_screen.dart';
+import 'package:laporin/screens/admin_forgot_password_screen.dart';
 import 'package:laporin/screens/register_screen.dart';
 import 'package:laporin/screens/home_screen.dart';
 import 'package:laporin/screens/admin/admin_home_screen.dart';
@@ -102,6 +103,11 @@ class AppRouter {
         path: '/login/admin',
         name: 'loginAdmin',
         builder: (context, state) => const AdminLoginScreen(),
+      ),
+      GoRoute(
+        path: '/login/admin/forgot-password',
+        name: 'adminForgotPassword',
+        builder: (context, state) => const AdminForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/register',

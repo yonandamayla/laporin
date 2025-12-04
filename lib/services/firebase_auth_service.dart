@@ -187,6 +187,39 @@ class FirebaseAuthService {
     }
   }
 
+  // Update user password (Admin only)
+  Future<void> updateUserPassword(String email, String newPassword) async {
+    try {
+      // Find user by email and update their password
+      final userQuery = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
+
+      if (userQuery.docs.isNotEmpty) {
+        final userDoc = userQuery.docs.first;
+        
+        // Note: Firebase Admin SDK would be needed for proper password updates
+        // For now, we'll store password in Firestore (should be hashed in production)
+        await _firestore.collection('users').doc(userDoc.id).update({
+          'password': newPassword,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+        
+        // If this is the current user, update their Firebase Auth password
+        if (_auth.currentUser != null && _auth.currentUser!.email == email) {
+          await _auth.currentUser!.updatePassword(newPassword);
+        }
+      } else {
+        throw 'User dengan email $email tidak ditemukan';
+      }
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw 'Gagal memperbarui password: $e';
+    }
+  }
+
   // Sign out
   Future<void> signOut() async {
     await _auth.signOut();

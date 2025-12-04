@@ -11,9 +11,9 @@ enum UserRole {
   String get displayName {
     switch (this) {
       case UserRole.user:
-        return 'User Biasa';
+        return 'User';
       case UserRole.mahasiswa:
-        return 'Civitas (Mahasiswa)';
+        return 'Mahasiswa';
       case UserRole.dosen:
         return 'Staff/Pengelola';
       case UserRole.admin:
