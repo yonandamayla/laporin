@@ -28,7 +28,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   Future<void> _loadSavedCredentials() async {
     final authProvider = context.read<AuthProvider>();
     final savedCredentials = await authProvider.getSavedAdminCredentials();
-    
+
     if (savedCredentials['remember'] == true) {
       setState(() {
         _emailController.text = savedCredentials['identity'] ?? '';
@@ -114,13 +114,28 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 12),
+
+                  // Lupa Password Link
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        context.push('/login/admin/forgot-password');
+                      },
+                      child: Text(
+                        'Lupa Password?',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
 
                   // Title
-                  Text(
-                    'Masuk sebagai Admin',
-                    style: AppTextStyles.h2,
-                  ),
+                  Text('Masuk sebagai Admin', style: AppTextStyles.h2),
                   const SizedBox(height: 40),
 
                   // Email Field
@@ -142,15 +157,22 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       prefixIcon: const Icon(Icons.email_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.greyLight),
+                        borderSide: const BorderSide(
+                          color: AppColors.greyLight,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.greyLight),
+                        borderSide: const BorderSide(
+                          color: AppColors.greyLight,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.secondary, width: 2),
+                        borderSide: const BorderSide(
+                          color: AppColors.secondary,
+                          width: 2,
+                        ),
                       ),
                       filled: true,
                       fillColor: AppColors.background,
@@ -159,7 +181,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Email tidak boleh kosong';
                       }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      if (!RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      ).hasMatch(value)) {
                         return 'Format email tidak valid';
                       }
                       return null;
@@ -198,15 +222,22 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.greyLight),
+                        borderSide: const BorderSide(
+                          color: AppColors.greyLight,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.greyLight),
+                        borderSide: const BorderSide(
+                          color: AppColors.greyLight,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.secondary, width: 2),
+                        borderSide: const BorderSide(
+                          color: AppColors.secondary,
+                          width: 2,
+                        ),
                       ),
                       filled: true,
                       fillColor: AppColors.background,
@@ -256,7 +287,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Kredensial tersimpan telah dihapus'),
+                                content: Text(
+                                  'Kredensial tersimpan telah dihapus',
+                                ),
                                 backgroundColor: AppColors.success,
                               ),
                             );
@@ -281,7 +314,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         width: double.infinity,
                         height: 54,
                         child: ElevatedButton(
-                          onPressed: authProvider.isLoading ? null : _handleLogin,
+                          onPressed: authProvider.isLoading
+                              ? null
+                              : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.secondary,
                             foregroundColor: AppColors.white,
@@ -299,10 +334,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : Text(
-                                  'Masuk',
-                                  style: AppTextStyles.button,
-                                ),
+                              : Text('Masuk', style: AppTextStyles.button),
                         ),
                       );
                     },

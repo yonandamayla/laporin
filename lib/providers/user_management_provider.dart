@@ -190,6 +190,30 @@ class UserManagementProvider with ChangeNotifier {
     }
   }
 
+  // Update user password
+  Future<bool> updateUserPassword(String userId, String email, String newPassword) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Update password in Firebase Auth
+      await _authService.updateUserPassword(email, newPassword);
+      
+      // Update password in Firestore (for admin tracking)
+      await _firestoreService.updateUserPassword(userId, newPassword);
+      
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Delete user
   Future<bool> deleteUser(String userId) async {
     _isLoading = true;
