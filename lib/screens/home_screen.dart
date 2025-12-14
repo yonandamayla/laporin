@@ -756,8 +756,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildFilterChip('Semua', Icons.all_inclusive),
-                      const SizedBox(width: 10),
+
                       _buildFilterChip('Diajukan', Icons.schedule_rounded),
                       const SizedBox(width: 10),
                       _buildFilterChip('Disetujui', Icons.check_circle_rounded),
@@ -1520,6 +1519,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 // Info Cards
                 _buildInfoSection(user),
 
+                const SizedBox(height: 16),
+
+                const SizedBox(height: 16),
+
+                // Menu Items
+                _buildMenuSection(context, authProvider),
+
                 const SizedBox(height: 20),
 
                 // Logout Button
@@ -1634,83 +1640,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildStatisticsSection(User user) {
-    final reportProvider = context.watch<ReportProvider>();
-    
-    // Filter reports by current user
-    final userReports = reportProvider.reports
-        .where((r) => r.reporter.id == user.id)
-        .toList();
-    
-    final userInProgress = userReports
-        .where((r) => r.status == ReportStatus.inProgress)
-        .length;
-    final userApproved = userReports
-        .where((r) => r.status == ReportStatus.approved)
-        .length;
-    final userRejected = userReports
-        .where((r) => r.status == ReportStatus.rejected)
-        .length;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Statistik Laporan Saya',
-            style: AppTextStyles.h3.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  icon: Icons.assignment_rounded,
-                  label: 'Total',
-                  value: userReports.length.toString(),
-                  color: AppColors.primary,
-                ).animate().fadeIn(delay: 100.ms, duration: 300.ms).scale(begin: Offset(0.8, 0.8), end: Offset(1, 1)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  icon: Icons.schedule_rounded,
-                  label: 'Diajukan',
-                  value: userInProgress.toString(),
-                  color: AppColors.warning,
-                ).animate().fadeIn(delay: 200.ms, duration: 300.ms).scale(begin: Offset(0.8, 0.8), end: Offset(1, 1)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  icon: Icons.check_circle_rounded,
-                  label: 'Disetujui',
-                  value: userApproved.toString(),
-                  color: AppColors.success,
-                ).animate().fadeIn(delay: 300.ms, duration: 300.ms).scale(begin: Offset(0.8, 0.8), end: Offset(1, 1)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatCard(
-                  icon: Icons.cancel_rounded,
-                  label: 'Ditolak',
-                  value: userRejected.toString(),
-                  color: AppColors.error,
-                ).animate().fadeIn(delay: 400.ms, duration: 300.ms).scale(begin: Offset(0.8, 0.8), end: Offset(1, 1)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildStatCard({
     required IconData icon,
